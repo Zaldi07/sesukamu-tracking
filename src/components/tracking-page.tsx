@@ -18,22 +18,41 @@ import {
   MapPin,
   Phone,
   ExternalLink,
-  Sparkles,
-  Database
+  Sparkles
 } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import logo from "@/assets/logo.png"
 
-// Ubah ke true untuk menggunakan Dummy Data simulasi lengkap,
-// atau false untuk menarik data langsung dari Google Sheets.
-const USE_DUMMY_DATA = true
+// Helper to normalize Google Sheets URL to export CSV endpoint
+function formatGoogleSheetCsvUrl(url?: string): string {
+  if (!url) return ""
+  let cleanUrl = url.trim()
+  if (cleanUrl.includes("/pubhtml")) {
+    cleanUrl = cleanUrl.replace("/pubhtml", "/pub")
+  }
+  if (cleanUrl.includes("/pub") && !cleanUrl.includes("output=csv")) {
+    cleanUrl += (cleanUrl.includes("?") ? "&" : "?") + "output=csv"
+  }
+  return cleanUrl
+}
+
+const DEFAULT_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4lQFbpqm66h6oZQaFG6AT5QwTkwfy7yaE-7O1FqFPrtx4inFQ9vbw43sICVVp6M8b6c6jAIKH4adM/pub?gid=1226834802&single=true&output=csv"
+
+const SPREADSHEET_URL = formatGoogleSheetCsvUrl(
+  (import.meta.env.VITE_SPREADSHEET_URL as string | undefined) ||
+  (import.meta.env.VITE_SPREADSHEET_CSV_URL as string | undefined) ||
+  DEFAULT_CSV_URL
+)
 
 // Raw row data from Google Sheets CSV
 export interface RawOrder {
   [key: string]: string | undefined
 }
+
+export type PaymentStatus = "proses" | "selesai" | "invalid"
 
 // Normalized Order Model for consistent access throughout the app
 export interface NormalizedOrder {
@@ -48,96 +67,21 @@ export interface NormalizedOrder {
   buktiBayar: string
   timestamp: string
   score: string
-  isKonfirmasi: boolean
+
+  // Status Tahap 1: Konfirmasi Pembayaran
+  paymentStatus: PaymentStatus // "proses" | "selesai" | "invalid"
+  isKonfirmasiSelesai: boolean
+  isKonfirmasiProses: boolean
+  isKonfirmasi: boolean // alias for isKonfirmasiSelesai
+
+  // Status Tahap 2 & 3
   isSiapDiambil: boolean
   isSelesai: boolean
   isInvalid: boolean
+
   statusText: string
 }
 
-// 5 Dummy Orders covering every stage and scenario
-export const DUMMY_ORDERS: RawOrder[] = [
-  {
-    Timestamp: "11/08/2026 0:52:34",
-    "ID Transaksi": "MOKA-9966",
-    "Nama lengkap kamu": "TESTING 123",
-    "Prodi kamu": "Pendidikan Ilmu Komputer",
-    "Nomor Whatsapp": "083862237755",
-    "Metode Pengambilan": "Antar ke kos (fee Rp5.000)",
-    "Alamat Kos": "Jl. Gegerkalong Girang No. 12, Kos Melati Kamar 3",
-    Order: "Paket B >> 65k",
-    "Upload bukti bayar": "https://drive.google.com/file/d/1example-bukti-bayar-moka-9966/view",
-    Score: "100",
-    "Konfirmasi Pembayaran": "TRUE",
-    "Siap Diambil": "TRUE",
-    Selesai: "FALSE",
-    Invalid: "FALSE"
-  },
-  {
-    Timestamp: "11/08/2026 01:15:20",
-    "ID Transaksi": "MOKA-1024",
-    "Nama lengkap kamu": "Ahmad Fauzi",
-    "Prodi kamu": "Teknik Elektro",
-    "Nomor Whatsapp": "081234567890",
-    "Metode Pengambilan": "Ambil di tempat (Sekretariat)",
-    "Alamat Kos": "",
-    Order: "Paket A >> 50k",
-    "Upload bukti bayar": "https://drive.google.com/file/d/1example-bukti-bayar-moka-1024/view",
-    Score: "100",
-    "Konfirmasi Pembayaran": "TRUE",
-    "Siap Diambil": "TRUE",
-    Selesai: "TRUE",
-    Invalid: "FALSE"
-  },
-  {
-    Timestamp: "11/08/2026 02:30:11",
-    "ID Transaksi": "MOKA-2048",
-    "Nama lengkap kamu": "Siti Nurhaliza",
-    "Prodi kamu": "Manajemen Bisnis",
-    "Nomor Whatsapp": "085712345678",
-    "Metode Pengambilan": "Antar ke kos (fee Rp5.000)",
-    "Alamat Kos": "Kos Putri Asri, Jl. Setiabudi No. 45, Bandung",
-    Order: "Paket C >> 85k",
-    "Upload bukti bayar": "https://drive.google.com/file/d/1example-bukti-bayar-moka-2048/view",
-    Score: "100",
-    "Konfirmasi Pembayaran": "TRUE",
-    "Siap Diambil": "FALSE",
-    Selesai: "FALSE",
-    Invalid: "FALSE"
-  },
-  {
-    Timestamp: "11/08/2026 03:45:00",
-    "ID Transaksi": "MOKA-3105",
-    "Nama lengkap kamu": "Rizky Pratama",
-    "Prodi kamu": "Ilmu Komunikasi",
-    "Nomor Whatsapp": "087812345678",
-    "Metode Pengambilan": "Ambil di tempat (Stand Utama)",
-    "Alamat Kos": "",
-    Order: "Paket B >> 65k",
-    "Upload bukti bayar": "https://drive.google.com/file/d/1example-bukti-bayar-moka-3105/view",
-    Score: "100",
-    "Konfirmasi Pembayaran": "FALSE",
-    "Siap Diambil": "FALSE",
-    Selesai: "FALSE",
-    Invalid: "FALSE"
-  },
-  {
-    Timestamp: "11/08/2026 04:10:22",
-    "ID Transaksi": "MOKA-4512",
-    "Nama lengkap kamu": "Dinda Ayu Lestari",
-    "Prodi kamu": "Desain Komunikasi Visual",
-    "Nomor Whatsapp": "089612345678",
-    "Metode Pengambilan": "Antar ke kos (fee Rp5.000)",
-    "Alamat Kos": "Jl. Sariwangi Asri Blok C No. 7",
-    Order: "Paket A >> 50k",
-    "Upload bukti bayar": "https://drive.google.com/file/d/1example-bukti-bayar-moka-4512/view",
-    Score: "100",
-    "Konfirmasi Pembayaran": "FALSE",
-    "Siap Diambil": "FALSE",
-    Selesai: "FALSE",
-    Invalid: "TRUE"
-  }
-]
 
 // Helper to check truthy checkbox value from Google Sheets
 function isTruthy(val: unknown): boolean {
@@ -223,56 +167,103 @@ export function normalizeOrder(raw: RawOrder): NormalizedOrder {
     raw["Skor"] ||
     ""
 
-  // 3 Tahap Checkbox values
-  // 1. Konfirmasi Pembayaran
-  const isKonfirmasi =
-    isTruthy(raw["Konfirmasi Pembayaran"]) ||
-    isTruthy(raw["Konfirmasi pembayaran"]) ||
-    isTruthy(raw["konfirmasi pembayaran"]) ||
-    isTruthy(raw["Konfirmasi"]) ||
-    isTruthy(raw["Valid"]) ||
-    isTruthy(raw["Sudah Bayar"]) ||
-    isTruthy(raw["Pembayaran"]) ||
-    (raw["Status"]?.toLowerCase().includes("konfirmasi") ?? false)
+  // 1. Status Konfirmasi Pembayaran (Kolom '1' / 'Konfirmasi Pembayaran')
+  const col1 = (
+    raw["1"] ||
+    raw["Konfirmasi Pembayaran"] ||
+    raw["Konfirmasi pembayaran"] ||
+    raw["konfirmasi pembayaran"] ||
+    raw["Status Pembayaran"] ||
+    raw["Status"] ||
+    ""
+  ).toLowerCase().trim()
 
-  // 2. Siap Diambil
-  const isSiapDiambil =
-    isTruthy(raw["Siap Diambil"]) ||
-    isTruthy(raw["Siap diambil"]) ||
-    isTruthy(raw["siap diambil"]) ||
-    isTruthy(raw["Siap Di Ambil"]) ||
-    isTruthy(raw["Siap di ambil"]) ||
-    isTruthy(raw["Cetak"]) ||
-    isTruthy(raw["Ready"]) ||
-    (raw["Status"]?.toLowerCase().includes("siap") ?? false)
+  const col2 = (
+    raw["2"] ||
+    raw["Siap Diambil"] ||
+    raw["Siap diambil"] ||
+    raw["siap diambil"] ||
+    raw["Status 2"] ||
+    ""
+  ).toLowerCase().trim()
 
-  // 3. Selesai
-  const isSelesai =
-    isTruthy(raw["Selesai"]) ||
-    isTruthy(raw["selesai"]) ||
-    isTruthy(raw["Diterima"]) ||
-    isTruthy(raw["diterima"]) ||
-    isTruthy(raw["Done"]) ||
-    (raw["Status"]?.toLowerCase() === "selesai")
-
-  // Invalid / Dibatalkan
+  // Status Invalid / Dibatalkan
   const isInvalid =
+    col1.includes("tidak valid") ||
+    col1.includes("invalid") ||
+    col1.includes("batal") ||
+    col1.includes("ditolak") ||
     isTruthy(raw["Invalid"]) ||
     isTruthy(raw["invalid"]) ||
-    isTruthy(raw["Batal"]) ||
-    isTruthy(raw["batal"]) ||
-    (raw["Status"]?.toLowerCase() === "invalid") ||
-    (raw["Status"]?.toLowerCase() === "batal")
+    isTruthy(raw["Batal"])
 
-  let statusText = "Menunggu Konfirmasi"
+  // Status Selesai (Tahap 3)
+  const isSelesai =
+    !isInvalid && (
+      col2.includes("selesai") ||
+      col2.includes("diterima") ||
+      col2.includes("done") ||
+      isTruthy(raw["Selesai"]) ||
+      isTruthy(raw["selesai"]) ||
+      isTruthy(raw["Diterima"])
+    )
+
+  // Status Siap Diambil / Diantar (Tahap 2)
+  const isSiapDiambil =
+    !isInvalid && (
+      isSelesai ||
+      col2.includes("siap") ||
+      col2.includes("ready") ||
+      col2.includes("ambil") ||
+      isTruthy(raw["Siap Diambil"]) ||
+      isTruthy(raw["Siap diambil"]) ||
+      isTruthy(raw["siap diambil"]) ||
+      isTruthy(raw["Ready"])
+    )
+
+  // Status Konfirmasi Pembayaran Selesai (Tahap 1 Done)
+  // Bernilai selesai jika:
+  // - col1 bernilai "selesai", "valid", "terverifikasi", "dikonfirmasi", "lunas", "sudah bayar", "true", "1"
+  // - ATAU pesanan sudah masuk ke tahap siap diambil / tahap selesai
+  const isKonfirmasiSelesai =
+    !isInvalid && (
+      isSelesai ||
+      isSiapDiambil ||
+      col1 === "selesai" ||
+      col1.includes("selesai") ||
+      col1 === "valid" ||
+      col1.includes("terverifikasi") ||
+      col1.includes("dikonfirmasi") ||
+      col1.includes("lunas") ||
+      col1.includes("sudah bayar") ||
+      isTruthy(raw["Konfirmasi Pembayaran"]) ||
+      isTruthy(raw["Konfirmasi pembayaran"]) ||
+      isTruthy(raw["Valid"])
+    )
+
+  // Status Konfirmasi Pembayaran Sedang Diproses (Tahap 1 Active)
+  const isKonfirmasiProses = !isInvalid && !isKonfirmasiSelesai
+
+  let paymentStatus: PaymentStatus = "proses"
   if (isInvalid) {
-    statusText = "Invalid / Dibatalkan"
+    paymentStatus = "invalid"
+  } else if (isKonfirmasiSelesai) {
+    paymentStatus = "selesai"
+  } else {
+    paymentStatus = "proses"
+  }
+
+  let statusText = "Verifikasi Pembayaran"
+  if (isInvalid) {
+    statusText = "Pembayaran Tidak Valid"
   } else if (isSelesai) {
-    statusText = "Selesai"
+    statusText = "Pesanan Selesai"
   } else if (isSiapDiambil) {
     statusText = "Siap Diambil"
-  } else if (isKonfirmasi) {
-    statusText = "Sedang Diproses"
+  } else if (isKonfirmasiSelesai) {
+    statusText = "Pembayaran Terverifikasi"
+  } else {
+    statusText = "Verifikasi Pembayaran"
   }
 
   return {
@@ -287,7 +278,10 @@ export function normalizeOrder(raw: RawOrder): NormalizedOrder {
     buktiBayar: buktiBayar.trim(),
     timestamp: timestamp.trim(),
     score: score.trim(),
-    isKonfirmasi,
+    paymentStatus,
+    isKonfirmasiSelesai,
+    isKonfirmasiProses,
+    isKonfirmasi: isKonfirmasiSelesai,
     isSiapDiambil,
     isSelesai,
     isInvalid,
@@ -315,7 +309,6 @@ export function TrackingPage() {
   const [allOrders, setAllOrders] = React.useState<NormalizedOrder[]>([])
   const [loading, setLoading] = React.useState<boolean>(true)
   const [error, setError] = React.useState<string | null>(null)
-  const [isUsingDummy, setIsUsingDummy] = React.useState<boolean>(USE_DUMMY_DATA)
 
   // Search states
   const [searchQuery, setSearchQuery] = React.useState<string>("")
@@ -328,7 +321,7 @@ export function TrackingPage() {
   // Layout states (Mobile slider)
   const [activeTab, setActiveTab] = React.useState<"list" | "detail">("list")
 
-  // Fetch CSV data or load dummy
+  // Fetch CSV data from Google Sheets
   const fetchData = React.useCallback(async (isBackground = false) => {
     const silent = typeof isBackground === "boolean" ? isBackground : false
     if (!silent) {
@@ -336,24 +329,11 @@ export function TrackingPage() {
     }
     setError(null)
 
-    // If dummy data mode is active, load dummy data directly
-    if (isUsingDummy) {
-      const normalized = DUMMY_ORDERS.map(row => normalizeOrder(row))
-      setAllOrders(normalized)
-      setSelectedOrder(current => {
-        if (!current) return null
-        return normalized.find(o => o.id === current.id || o.name === current.name) || null
-      })
-      setTimeout(() => setLoading(false), 200)
-      return
-    }
-
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 8000)
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
 
     try {
-      const csvUrl =
-        "https://docs.google.com/spreadsheets/d/e/2PACX-1vSJOR0cIVtTswFxo_yuhiPSR33JltUY77O6ffZMLNeZWRh-5rgZxnTJzkU1Kte7Y8wsL9TbwWi7VTp0/pub?gid=0&single=true&output=csv"
+      const csvUrl = SPREADSHEET_URL || DEFAULT_CSV_URL
 
       const response = await fetch(csvUrl, {
         signal: controller.signal,
@@ -376,14 +356,10 @@ export function TrackingPage() {
             .map(row => normalizeOrder(row))
             .filter(o => o.id || o.name)
 
+          setAllOrders(normalized)
           if (normalized.length > 0) {
-            setAllOrders(normalized)
             localStorage.setItem("cached_orders_data", JSON.stringify(parsed))
             localStorage.setItem("cached_orders_timestamp", Date.now().toString())
-          } else {
-            // Fallback to dummy if parsed spreadsheet has no rows
-            const fallbackDummy = DUMMY_ORDERS.map(row => normalizeOrder(row))
-            setAllOrders(fallbackDummy)
           }
 
           setSelectedOrder(current => {
@@ -401,7 +377,7 @@ export function TrackingPage() {
       clearTimeout(timeoutId)
       console.error(err)
 
-      // Fallback to cached or dummy
+      // Fallback to cached data if available
       const cachedData = localStorage.getItem("cached_orders_data")
       if (cachedData) {
         try {
@@ -409,25 +385,20 @@ export function TrackingPage() {
           setAllOrders(parsed.map(row => normalizeOrder(row)))
           setError("Koneksi lambat. Menampilkan data offline terakhir.")
         } catch {
-          setAllOrders(DUMMY_ORDERS.map(row => normalizeOrder(row)))
+          setAllOrders([])
+          setError("Gagal memuat data. Silakan periksa koneksi internet Anda.")
         }
       } else {
-        setAllOrders(DUMMY_ORDERS.map(row => normalizeOrder(row)))
-        setError("Koneksi timeout. Menampilkan data simulasi (Dummy Data).")
+        setAllOrders([])
+        setError("Gagal memuat data dari server. Silakan periksa koneksi internet Anda.")
       }
       setLoading(false)
     }
-  }, [isUsingDummy])
+  }, [])
 
   // Load data on mount
   React.useEffect(() => {
-    if (isUsingDummy) {
-      const normalized = DUMMY_ORDERS.map(row => normalizeOrder(row))
-      setAllOrders(normalized)
-      setLoading(false)
-    } else {
-      fetchData(false)
-    }
+    fetchData(false)
 
     const history = localStorage.getItem("tracking_recent_searches")
     if (history) {
@@ -437,7 +408,7 @@ export function TrackingPage() {
         // ignore
       }
     }
-  }, [fetchData, isUsingDummy])
+  }, [fetchData])
 
   // Save query to history
   const addToHistory = (query: string) => {
@@ -534,63 +505,76 @@ export function TrackingPage() {
 
   // 3-Stage Progress Calculations
   const getSteps = (order: NormalizedOrder): Step[] => {
-    const { isKonfirmasi, isSiapDiambil, isSelesai, isInvalid } = order
+    const { isInvalid, isKonfirmasiSelesai, isSiapDiambil, isSelesai } = order
 
     const steps: Step[] = []
 
     // 1. Konfirmasi Pembayaran
     let step1Status: Step["status"] = "pending"
-    if (isInvalid) step1Status = "failed"
-    else if (isKonfirmasi || isSiapDiambil || isSelesai) step1Status = "done"
-    else step1Status = "active"
+    if (isInvalid) {
+      step1Status = "failed"
+    } else if (isKonfirmasiSelesai) {
+      step1Status = "done"
+    } else {
+      // isKonfirmasiProses
+      step1Status = "active"
+    }
 
     steps.push({
       title: "Konfirmasi Pembayaran",
       description: isInvalid
-        ? "Verifikasi gagal / pesanan dibatalkan. Hubungi admin untuk informasi lebih lanjut."
+        ? "Pembayaran tidak valid atau ditolak. Silakan hubungi admin untuk konfirmasi ulang bukti transfer."
         : step1Status === "done"
-          ? "Pembayaran telah dikonfirmasi dan diverifikasi oleh admin."
-          : "Menunggu admin memverifikasi bukti pembayaran Anda.",
+          ? "Pembayaran telah selesai diverifikasi & dikonfirmasi oleh admin."
+          : "Sedang diproses: Admin sedang memeriksa dan memverifikasi bukti transfer pembayaran Anda.",
       status: step1Status
     })
 
-    // 2. Siap Diambil
+    // 2. Siap Diambil / Diantar
     let step2Status: Step["status"] = "pending"
-    if (isInvalid) step2Status = "failed"
-    else if (isSiapDiambil || isSelesai) step2Status = "done"
-    else if (step1Status === "done") step2Status = "active"
+    if (isInvalid) {
+      step2Status = "failed"
+    } else if (isSiapDiambil || isSelesai) {
+      step2Status = "done"
+    } else if (isKonfirmasiSelesai) {
+      step2Status = "active"
+    }
 
     const siapDiambilDesc = order.metodePengambilan?.toLowerCase().includes("kos")
       ? "Pesanan sudah siap. Untuk pengantaran via kos akan dihubungi oleh admin."
-      : "Pesanan sudah siap. Untuk pengantaran di UPI akan diinfokan lebih lanjut."
+      : "Pesanan sudah siap. Silakan ambil pesanan Anda di titik pengambilan UPI."
 
     steps.push({
       title: "Siap Diambil",
       description: isInvalid
-        ? "Proses dihentikan karena pesanan berstatus invalid."
+        ? "Proses pesanan dihentikan karena pembayaran tidak valid."
         : step2Status === "done"
           ? siapDiambilDesc
           : step2Status === "active"
-            ? "Pesanan Anda sedang disiapkan / dikemas oleh tim."
-            : "Pesanan akan diproses setelah pembayaran dikonfirmasi.",
+            ? "Pembayaran terverifikasi! Pesanan Anda saat ini sedang dikemas & disiapkan."
+            : "Pesanan akan disiapkan setelah tahap konfirmasi pembayaran selesai.",
       status: step2Status
     })
 
     // 3. Selesai
     let step3Status: Step["status"] = "pending"
-    if (isInvalid) step3Status = "failed"
-    else if (isSelesai) step3Status = "done"
-    else if (step2Status === "done") step3Status = "active"
+    if (isInvalid) {
+      step3Status = "failed"
+    } else if (isSelesai) {
+      step3Status = "done"
+    } else if (step2Status === "done") {
+      step3Status = "active"
+    }
 
     steps.push({
       title: "Selesai",
       description: isInvalid
         ? "Pesanan tidak dapat diselesaikan."
         : isSelesai
-          ? "Pesanan telah selesai diserahkan / diterima. Terima kasih!"
+          ? "Pesanan telah selesai diserahkan / diterima. Terima kasih atas pesanan Anda!"
           : step3Status === "active"
-            ? "Silakan ambil pesanan Anda sesuai metode pengambilan."
-            : "Tahap penyelesaian setelah pesanan diserahkan.",
+            ? "Silakan ambil pesanan Anda sesuai metode pengambilan yang dipilih."
+            : "Tahap penyelesaian setelah pesanan diterima oleh pemesan.",
       status: step3Status
     })
 
@@ -601,35 +585,35 @@ export function TrackingPage() {
   const getStatusConfig = (order: NormalizedOrder) => {
     if (order.isInvalid) {
       return {
-        label: "Invalid / Batal",
-        badge: "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border-rose-100 dark:border-rose-900/50",
+        label: "Pembayaran Tidak Valid",
+        badge: "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border-rose-200 dark:border-rose-900/50",
         icon: XCircle
       }
     }
     if (order.isSelesai) {
       return {
-        label: "Selesai",
-        badge: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/50",
+        label: "Pesanan Selesai",
+        badge: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50",
         icon: CheckCircle2
       }
     }
     if (order.isSiapDiambil) {
       return {
         label: "Siap Diambil",
-        badge: "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 border-blue-100 dark:border-blue-900/50",
+        badge: "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 border-blue-200 dark:border-blue-900/50",
         icon: PackageCheck
       }
     }
-    if (order.isKonfirmasi) {
+    if (order.isKonfirmasiSelesai) {
       return {
-        label: "Sedang Diproses",
-        badge: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border-amber-100 dark:border-amber-900/50",
-        icon: Clock
+        label: "Pembayaran Terverifikasi",
+        badge: "bg-teal-50 text-teal-700 dark:bg-teal-950/30 dark:text-teal-400 border-teal-200 dark:border-teal-900/50",
+        icon: CheckCircle2
       }
     }
     return {
-      label: "Menunggu Konfirmasi",
-      badge: "bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400 border-purple-100 dark:border-purple-900/50",
+      label: "Verifikasi Pembayaran",
+      badge: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200 dark:border-amber-900/50",
       icon: Clock
     }
   }
@@ -642,30 +626,6 @@ export function TrackingPage() {
           <BrandLogo />
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Toggle Dummy Data Mode Button */}
-            <button
-              onClick={() => {
-                const nextState = !isUsingDummy
-                setIsUsingDummy(nextState)
-                if (nextState) {
-                  setAllOrders(DUMMY_ORDERS.map(row => normalizeOrder(row)))
-                } else {
-                  fetchData(false)
-                }
-              }}
-              className={cn(
-                "rounded-[4px] border px-2.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer",
-                isUsingDummy
-                  ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300"
-                  : "bg-zinc-50 border-zinc-200 text-zinc-600 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-400 hover:text-zinc-900"
-              )}
-              title="Toggle antara Dummy Data dan Google Sheets Live"
-            >
-              <Database className="size-3" />
-              <span className="hidden sm:inline">
-                {isUsingDummy ? "Mode: Dummy Data" : "Mode: Live Sheet"}
-              </span>
-            </button>
 
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -775,28 +735,6 @@ export function TrackingPage() {
               ))}
             </div>
           )}
-
-          {/* Quick Dummy Sample Buttons for 1-click test */}
-          {!searched && (
-            <div className="mt-3 text-center sm:text-left text-xs text-zinc-400 dark:text-zinc-500">
-              <span className="font-semibold text-zinc-500 dark:text-zinc-400">Contoh pencarian (klik untuk coba): </span>
-              <div className="inline-flex flex-wrap gap-1.5 mt-1.5 sm:mt-0">
-                {allOrders.slice(0, 4).map((o, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => {
-                      const val = o.id || o.name
-                      setSearchQuery(val)
-                      handleSearch(val, false)
-                    }}
-                    className="underline hover:text-primary font-medium text-zinc-600 dark:text-zinc-300 cursor-pointer"
-                  >
-                    {o.id} ({o.name.split(" ")[0]})
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Main Content Area */}
@@ -839,79 +777,68 @@ export function TrackingPage() {
           {/* 2. Content Loaded */}
           {!loading && (
             <>
-              {/* Empty Initial State: Show sample list preview */}
+              {/* Empty Initial State: Instruction and guidance */}
               {!searched && (
                 <div className="max-w-2xl mx-auto space-y-6">
-                  <div className="text-center border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-[6px] p-6 sm:p-8 shadow-xs">
-                    <div className="mx-auto size-12 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-[4px] flex items-center justify-center mb-4 text-zinc-400">
+                  <div className="text-center border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-[8px] p-6 sm:p-8 shadow-xs">
+                    <div className="mx-auto size-12 bg-primary/10 text-primary border border-primary/20 rounded-[8px] flex items-center justify-center mb-4">
                       <Search className="size-5" />
                     </div>
-                    <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50">Lacak Status Pesanan</h3>
-                    <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
-                      Ketik ID Transaksi (contoh: <span className="font-mono font-semibold text-primary">MOKA-9966</span>) atau Nama Lengkap untuk melacak status pesanan Anda.
+                    <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-50">Lacak Status Pesanan</h3>
+                    <p className="mt-2 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+                      Masukkan <span className="font-semibold text-zinc-800 dark:text-zinc-200">ID Transaksi</span> (contoh: <span className="font-mono font-semibold text-primary">MOKA-9966</span>) atau <span className="font-semibold text-zinc-800 dark:text-zinc-200">Nama Lengkap</span> pada kolom pencarian di atas untuk melacak pesanan Anda.
                     </p>
 
-                    <div className="mt-6 border-t border-zinc-100 dark:border-zinc-800 pt-5 text-left text-xs text-zinc-400 dark:text-zinc-500">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <strong className="text-zinc-700 dark:text-zinc-300 block mb-1">3 Tahap Pelacakan:</strong>
-                          1. Konfirmasi Pembayaran<br />
-                          2. Siap Diambil<br />
-                          3. Selesai
+                    {/* 3 Step Explanation */}
+                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+                      <div className="p-3.5 rounded-[6px] bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/80 dark:border-zinc-800">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="size-5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-bold flex items-center justify-center">1</span>
+                          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Verifikasi</span>
                         </div>
-                        <div>
-                          <strong className="text-zinc-700 dark:text-zinc-300 block mb-1">Daftar Dummy Data Tersedia:</strong>
-                          Tersedia {allOrders.length} data simulasi untuk mencoba berbagai variasi status dan metode pengambilan.
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                          Admin memverifikasi bukti transfer & kelengkapan data pesanan.
+                        </p>
+                      </div>
+
+                      <div className="p-3.5 rounded-[6px] bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/80 dark:border-zinc-800">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="size-5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px] font-bold flex items-center justify-center">2</span>
+                          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Siap Diambil</span>
                         </div>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                          Pesanan selesai dipacking dan siap diambil / diantar ke alamat kos.
+                        </p>
+                      </div>
+
+                      <div className="p-3.5 rounded-[6px] bg-zinc-50 dark:bg-zinc-950/60 border border-zinc-200/80 dark:border-zinc-800">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="size-5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold flex items-center justify-center">3</span>
+                          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Selesai</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                          Pesanan telah diserahterimakan kepada pemesan secara sukses.
+                        </p>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Dummy Data Quick List Cards */}
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-between px-1">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                        Pilih Data Simulasi Untuk Dilihat:
-                      </span>
-                      <span className="text-[10px] text-zinc-400">
-                        {allOrders.length} pesanan
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {allOrders.map((order, idx) => {
-                        const statusInfo = getStatusConfig(order)
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              setSelectedOrder(order)
-                              setSearchQuery(order.id)
-                              setSearchResults([order])
-                              setSearched(true)
-                              setActiveTab("detail")
-                            }}
-                            className="w-full text-left p-3.5 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-[6px] hover:border-primary/50 dark:hover:border-primary/50 transition-all cursor-pointer flex flex-col gap-1.5 shadow-2xs"
-                          >
-                            <div className="flex items-center justify-between w-full">
-                              <span className="font-mono text-xs font-bold text-zinc-900 dark:text-zinc-50 flex items-center">
-                                <Hash className="size-3 text-zinc-400 mr-0.5" />
-                                {order.id}
-                              </span>
-                              <span className={cn("text-[9px] px-2 py-0.5 rounded-full border font-semibold", statusInfo.badge)}>
-                                {statusInfo.label}
-                              </span>
-                            </div>
-                            <div className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
-                              {order.name}
-                            </div>
-                            <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 flex justify-between">
-                              <span className="truncate max-w-[150px]">{order.prodi}</span>
-                              <span className="font-medium text-zinc-700 dark:text-zinc-300">{order.order.replace(">>", "→")}</span>
-                            </div>
-                          </button>
-                        )
-                      })}
+                    {/* WhatsApp Help CTA */}
+                    <div className="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                      <div>
+                        <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Pesanan belum terdata atau ada pertanyaan?</p>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Tim admin kami siap membantu pengecekan langsung.</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs h-8 gap-1.5 rounded-[4px] cursor-pointer whitespace-nowrap"
+                        asChild
+                      >
+                        <a href="https://wa.link/tddgvy" target="_blank" rel="noreferrer">
+                          <Phone className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                          Hubungi Admin
+                        </a>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -1298,17 +1225,17 @@ function OrderDetailCard({ order, steps, statusInfo }: OrderDetailCardProps) {
           </div>
         </div>
 
-        {/* Action / Information Banner */}
+        {/* Status Notice Alert */}
         {order.isInvalid ? (
-          <div className="p-3.5 bg-rose-50 border border-rose-100 dark:bg-rose-950/20 dark:border-rose-900/50 rounded-[4px] flex gap-2.5 text-xs text-rose-700 dark:text-rose-400">
-            <AlertTriangle className="size-4 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-bold">Pesanan Ditandai Invalid / Dibatalkan</p>
-              <p className="leading-relaxed text-[11px] text-rose-600/95 dark:text-rose-400/90">
-                Terdapat kendala data atau pembayaran pada pesanan Anda. Silakan hubungi admin panitia via WhatsApp:
+          <div className="p-3.5 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/40 rounded-[4px] flex gap-2 text-rose-700 dark:text-rose-400 text-xs">
+            <AlertTriangle className="size-3.5 shrink-0 mt-0.5 text-rose-500" />
+            <div className="space-y-1 leading-relaxed text-[11px]">
+              <span className="font-semibold text-rose-800 dark:text-rose-300 block">Status: Pembayaran Tidak Valid</span>
+              <p>
+                Bukti pembayaran tidak valid atau terdapat kendala pada transaksi Anda. Silakan hubungi admin kami untuk konfirmasi dan bantuan lebih lanjut.
               </p>
               <a
-                href={`https://wa.me/6283862237755?text=Halo%20admin,%20saya%20ingin%20mengonfirmasi%20status%20pesanan%20dengan%20ID%20${encodeURIComponent(order.id)}`}
+                href="https://wa.link/tddgvy"
                 className="inline-flex items-center gap-1 font-bold underline hover:text-rose-800 dark:hover:text-rose-300 pt-0.5"
                 target="_blank"
                 rel="noreferrer"
@@ -1337,20 +1264,20 @@ function OrderDetailCard({ order, steps, statusInfo }: OrderDetailCardProps) {
               )}
             </div>
           </div>
-        ) : order.isKonfirmasi ? (
-          <div className="p-3.5 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 rounded-[4px] flex gap-2 text-amber-700 dark:text-amber-400 text-xs">
-            <Clock className="size-3.5 shrink-0 mt-0.5 text-amber-600" />
+        ) : order.isKonfirmasiSelesai ? (
+          <div className="p-3.5 bg-teal-50/50 dark:bg-teal-950/20 border border-teal-100 dark:border-teal-900/40 rounded-[4px] flex gap-2 text-teal-700 dark:text-teal-400 text-xs">
+            <CheckCircle2 className="size-3.5 shrink-0 mt-0.5 text-teal-600" />
             <div className="space-y-0.5 leading-relaxed text-[11px]">
-              <span className="font-semibold text-amber-800 dark:text-amber-300 block">Sedang Diproses</span>
-              Pembayaran telah terkonfirmasi. Pesanan Anda saat ini sedang dalam proses penyiapan oleh tim.
+              <span className="font-semibold text-teal-800 dark:text-teal-300 block">Pembayaran Terverifikasi</span>
+              Pembayaran telah diverifikasi oleh admin. Pesanan Anda saat ini sedang dalam proses penyiapan dan pengemasan oleh tim.
             </div>
           </div>
         ) : (
-          <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-150 dark:border-zinc-800 rounded-[4px] flex gap-2 text-zinc-500 dark:text-zinc-400 text-xs">
-            <Clock className="size-3.5 shrink-0 mt-0.5 text-zinc-400" />
+          <div className="p-3.5 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 rounded-[4px] flex gap-2 text-amber-700 dark:text-amber-400 text-xs">
+            <Clock className="size-3.5 shrink-0 mt-0.5 text-amber-600" />
             <div className="space-y-0.5 leading-relaxed text-[11px]">
-              <span className="font-semibold text-zinc-700 dark:text-zinc-300 block">Menunggu Konfirmasi Pembayaran</span>
-              Admin akan memeriksa dan memverifikasi bukti pembayaran yang telah Anda unggah.
+              <span className="font-semibold text-amber-800 dark:text-amber-300 block">Verifikasi Pembayaran (Sedang Diproses)</span>
+              Admin sedang memeriksa dan memverifikasi bukti transfer pembayaran Anda. Mohon tunggu proses pengecekan berkala.
             </div>
           </div>
         )}
