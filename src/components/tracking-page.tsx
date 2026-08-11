@@ -1064,7 +1064,7 @@ export function TrackingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-16 border-t border-zinc-100 bg-white/20 py-8 text-center text-[10px] text-zinc-400 dark:text-zinc-600 font-sans">
+      <footer className="mt-16 border-t border-zinc-200 dark:border-zinc-800/80 bg-white/50 dark:bg-zinc-950 py-8 text-center text-[11px] text-zinc-500 dark:text-zinc-400 font-sans">
         <p>© 2026 Tracking Order App. All rights reserved.</p>
       </footer>
     </div>
