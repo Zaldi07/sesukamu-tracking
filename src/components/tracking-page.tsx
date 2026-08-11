@@ -895,15 +895,18 @@ export function TrackingPage() {
                         <p className="font-bold text-zinc-700 dark:text-zinc-300">Tips Pencarian:</p>
                         <ul className="list-disc pl-4 space-y-1">
                           <li>Pastikan penulisan nama lengkap atau nama depan sudah benar.</li>
-                          <li>Anda juga dapat mencari menggunakan ID Order (contoh: <span className="font-mono">MO-001</span>).</li>
                         </ul>
                       </div>
-                      <div className="mt-6 flex justify-center gap-3">
-                        <Button variant="outline" className="rounded-[4px] text-xs h-8 cursor-pointer" onClick={handleClear}>
+                      <div className="mt-6 flex items-center justify-center gap-3">
+                        <Button
+                          variant="outline"
+                          className="w-36 h-9 rounded-[4px] text-xs font-semibold cursor-pointer"
+                          onClick={handleClear}
+                        >
                           Kembali
                         </Button>
                         <Button
-                          className="bg-primary hover:bg-primary/95 text-white rounded-[4px] border-0 text-xs h-8 cursor-pointer"
+                          className="w-36 h-9 bg-primary hover:bg-primary/95 text-white rounded-[4px] border-0 text-xs font-semibold cursor-pointer"
                           asChild
                         >
                           <a href="https://wa.link/tddgvy" target="_blank" rel="noreferrer">
