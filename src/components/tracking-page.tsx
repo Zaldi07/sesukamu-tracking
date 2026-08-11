@@ -16,9 +16,7 @@ import {
   PackageCheck,
   Package,
   MapPin,
-  Phone,
-  ExternalLink,
-  Sparkles
+  Phone
 } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
@@ -326,8 +324,12 @@ export interface Step {
 // Brand Logo Component
 function BrandLogo() {
   return (
-    <div className="flex items-center gap-2">
-      <img src={logo} alt="Logo" className="h-10 sm:h-12 w-auto object-contain" />
+    <div className="flex items-center gap-2 py-1">
+      <img
+        src={logo}
+        alt="Logo"
+        className="h-14 sm:h-20 md:h-20 w-auto object-contain transition-all"
+      />
     </div>
   )
 }
@@ -657,29 +659,26 @@ export function TrackingPage() {
     <div className="min-h-screen w-full bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 font-sans transition-colors duration-200">
       {/* Header bar */}
       <header className="sticky top-0 z-40 w-full border-b border-zinc-200 bg-white/95 backdrop-blur-xs dark:border-zinc-800 dark:bg-zinc-950/95">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex min-h-18 sm:min-h-22 max-w-5xl items-center justify-between px-4 sm:px-6 py-2">
           <BrandLogo />
 
           <div className="flex items-center gap-2 sm:gap-3">
-
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="rounded-[4px] border border-zinc-200 p-2 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50 transition-all cursor-pointer"
-              title="Toggle theme"
+              className="size-9 flex items-center justify-center rounded-[4px] border border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50 transition-all cursor-pointer"
+              title="Ganti tema"
             >
               {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </button>
 
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => fetchData(false)}
               disabled={loading}
-              className="rounded-[4px] border-zinc-200 dark:border-zinc-800 text-xs cursor-pointer"
+              className="size-9 flex items-center justify-center rounded-[4px] border border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50 transition-all cursor-pointer disabled:opacity-50"
+              title="Perbarui data"
             >
-              <RefreshCw className={cn("size-3 mr-1.5", loading && "animate-spin")} />
-              <span className="hidden sm:inline">Perbarui</span>
-            </Button>
+              <RefreshCw className={cn("size-4", loading && "animate-spin")} />
+            </button>
           </div>
         </div>
       </header>
@@ -688,7 +687,6 @@ export function TrackingPage() {
         {/* Hero Section */}
         <div className="text-center mb-8 md:mb-10">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-3">
-            <Sparkles className="size-3.5" />
             <span>Tracking Pesanan Online</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-3xl md:text-4xl">
@@ -1063,9 +1061,8 @@ export function TrackingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-16 border-t border-zinc-100 dark:border-zinc-900 bg-white/20 py-8 text-center text-[10px] text-zinc-400 dark:text-zinc-600 font-sans">
+      <footer className="mt-16 border-t border-zinc-100 bg-white/20 py-8 text-center text-[10px] text-zinc-400 dark:text-zinc-600 font-sans">
         <p>© 2026 Tracking Order App. All rights reserved.</p>
-        <p className="mt-0.5">Sistem Pelacakan Mandiri Terintegrasi Google Sheets.</p>
       </footer>
     </div>
   )
@@ -1088,16 +1085,10 @@ function OrderDetailCard({ order, steps, statusInfo }: OrderDetailCardProps) {
   // Clean order string display
   const displayOrder = order.order ? order.order.replace(">>", "→") : "-"
 
-  // Format WA URL if valid
-  const cleanWa = order.whatsapp.replace(/[^0-9]/g, "")
-  const waUrl = cleanWa
-    ? `https://wa.me/${cleanWa.startsWith("0") ? "62" + cleanWa.slice(1) : cleanWa}`
-    : null
-
   return (
-    <div className="border border-zinc-200 dark:border-zinc-800 rounded-[6px] bg-white dark:bg-zinc-900 overflow-hidden shadow-xs">
+    <div className="border dark:border-zinc-800 rounded-[6px] dark:bg-zinc-900 overflow-hidden shadow-xs">
       {/* Top Banner */}
-      <div className="border-b border-zinc-100 dark:border-zinc-800 p-4 sm:p-5 bg-zinc-50/50 dark:bg-zinc-900/40">
+      <div className="border-b dark:border-zinc-800 p-4 sm:p-5 dark:bg-zinc-900/40">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -1160,7 +1151,7 @@ function OrderDetailCard({ order, steps, statusInfo }: OrderDetailCardProps) {
           </div>
 
           {/* Metode Pengambilan */}
-          <div className="space-y-0.5">
+          <div className="space-y-0.5 sm:col-span-2">
             <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1">
               <MapPin className="size-3" />
               <span>Metode Pengambilan</span>
@@ -1173,27 +1164,6 @@ function OrderDetailCard({ order, steps, statusInfo }: OrderDetailCardProps) {
                 Alamat Kos: <span className="font-medium text-zinc-700 dark:text-zinc-300">{order.alamatKos}</span>
               </div>
             )}
-          </div>
-
-          {/* Nomor WhatsApp */}
-          <div className="space-y-1">
-            <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1">
-              <Phone className="size-3" />
-              <span>Kontak WhatsApp</span>
-            </div>
-            <div className="text-xs text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
-              <span>{order.whatsapp || "-"}</span>
-              {waUrl && (
-                <a
-                  href={waUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[10px] text-emerald-600 hover:underline font-semibold inline-flex items-center gap-0.5"
-                >
-                  WhatsApp <ExternalLink className="size-2.5" />
-                </a>
-              )}
-            </div>
           </div>
         </div>
 
