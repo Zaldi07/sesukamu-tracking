@@ -58,6 +58,9 @@ export type PaymentStatus = "proses" | "selesai" | "invalid"
 export interface NormalizedOrder {
   raw: RawOrder
   id: string
+  idOrder: string
+  idTransaksi: string
+  sektor: string
   name: string
   prodi: string
   whatsapp: string
@@ -93,14 +96,36 @@ function isTruthy(val: unknown): boolean {
 
 // Normalize raw CSV row into NormalizedOrder
 export function normalizeOrder(raw: RawOrder): NormalizedOrder {
-  const id =
-    raw["ID Transaksi"] ||
-    raw["id order"] ||
+  const idOrder = (
     raw["ID Order"] ||
+    raw["id order"] ||
+    raw["Id Order"] ||
+    raw["ID_Order"] ||
+    raw["ID Pesanan"] ||
+    raw["id pesanan"] ||
+    ""
+  ).trim()
+
+  const idTransaksi = (
+    raw["ID Transaksi"] ||
     raw["Id Transaksi"] ||
     raw["id transaksi"] ||
-    raw["ID"] ||
+    raw["ID_Transaksi"] ||
     ""
+  ).trim()
+
+  const fallbackId = (raw["ID"] || raw["id"] || "").trim()
+
+  // ID utama diambil dari ID Order (contoh: MO-001), fallback ke ID Transaksi / ID generic
+  const id = idOrder || idTransaksi || fallbackId
+
+  const sektor = (
+    raw["Sektor kamu"] ||
+    raw["Sektor Kamu"] ||
+    raw["Sektor"] ||
+    raw["sektor"] ||
+    ""
+  ).trim()
 
   const name =
     raw["Nama lengkap kamu"] ||
@@ -269,6 +294,9 @@ export function normalizeOrder(raw: RawOrder): NormalizedOrder {
   return {
     raw,
     id: id.trim(),
+    idOrder: idOrder.trim(),
+    idTransaksi: idTransaksi.trim(),
+    sektor: sektor.trim(),
     name: name.trim(),
     prodi: prodi.trim(),
     whatsapp: whatsapp.trim(),
@@ -444,11 +472,14 @@ export function TrackingPage() {
 
       const results = allOrders.filter(order => {
         const idMatch = order.id.toLowerCase().includes(queryClean)
+        const idOrderMatch = order.idOrder.toLowerCase().includes(queryClean)
+        const idTransaksiMatch = order.idTransaksi.toLowerCase().includes(queryClean)
         const nameMatch = order.name.toLowerCase().includes(queryClean)
         const prodiMatch = order.prodi.toLowerCase().includes(queryClean)
         const waMatch = order.whatsapp.toLowerCase().includes(queryClean)
+        const sektorMatch = order.sektor.toLowerCase().includes(queryClean)
 
-        return idMatch || nameMatch || prodiMatch || waMatch
+        return idMatch || idOrderMatch || idTransaksiMatch || nameMatch || prodiMatch || waMatch || sektorMatch
       })
 
       setSearchResults(results)
@@ -457,7 +488,11 @@ export function TrackingPage() {
         setActiveTab("detail")
       } else if (results.length > 1) {
         const exactMatch = results.find(
-          r => r.id.toLowerCase() === queryClean || r.name.toLowerCase() === queryClean
+          r =>
+            r.id.toLowerCase() === queryClean ||
+            r.idOrder.toLowerCase() === queryClean ||
+            r.idTransaksi.toLowerCase() === queryClean ||
+            r.name.toLowerCase() === queryClean
         )
         setSelectedOrder(exactMatch || results[0])
         setActiveTab("list")
@@ -680,7 +715,7 @@ export function TrackingPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari ID Transaksi atau Nama Lengkap Anda..."
+              placeholder="Cari Nama Lengkap Anda..."
               className="w-full bg-transparent border-0 outline-hidden py-2 px-1 text-sm text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-0 focus:outline-hidden"
             />
             {searchQuery && (
@@ -786,7 +821,7 @@ export function TrackingPage() {
                     </div>
                     <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-50">Lacak Status Pesanan</h3>
                     <p className="mt-2 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
-                      Masukkan <span className="font-semibold text-zinc-800 dark:text-zinc-200">ID Transaksi</span> (contoh: <span className="font-mono font-semibold text-primary">MOKA-9966</span>) atau <span className="font-semibold text-zinc-800 dark:text-zinc-200">Nama Lengkap</span> pada kolom pencarian di atas untuk melacak pesanan Anda.
+                      Masukkan <span className="font-semibold text-zinc-800 dark:text-zinc-200">Nama Lengkap</span> Anda pada kolom pencarian di atas untuk melacak pesanan Anda.
                     </p>
 
                     {/* 3 Step Explanation */}
@@ -861,8 +896,8 @@ export function TrackingPage() {
                       <div className="mt-5 p-3.5 rounded-[4px] bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-850 text-xs text-left max-w-sm mx-auto space-y-1.5 text-zinc-500 dark:text-zinc-400">
                         <p className="font-bold text-zinc-700 dark:text-zinc-300">Tips Pencarian:</p>
                         <ul className="list-disc pl-4 space-y-1">
-                          <li>Pastikan penulisan ID Transaksi sudah benar (contoh: <span className="font-mono">MOKA-9966</span>).</li>
-                          <li>Coba cari menggunakan nama depan atau nama lengkap.</li>
+                          <li>Pastikan penulisan nama lengkap atau nama depan sudah benar.</li>
+                          <li>Anda juga dapat mencari menggunakan ID Order (contoh: <span className="font-mono">MO-001</span>).</li>
                         </ul>
                       </div>
                       <div className="mt-6 flex justify-center gap-3">
@@ -1069,6 +1104,16 @@ function OrderDetailCard({ order, steps, statusInfo }: OrderDetailCardProps) {
               <span className="font-mono text-xs font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-[4px] text-zinc-800 dark:text-zinc-200 border border-zinc-200/50 dark:border-zinc-700/50 select-none">
                 {order.id || "ID TIDAK TERSEDIA"}
               </span>
+              {order.idTransaksi && order.idTransaksi !== order.id && (
+                <span className="font-mono text-[10px] text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/60 px-1.5 py-0.5 rounded-[4px] border border-zinc-200/50 dark:border-zinc-700/40 select-none">
+                  Trx: {order.idTransaksi}
+                </span>
+              )}
+              {order.sektor && (
+                <span className="text-[10px] font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-[4px] border border-zinc-200/50 dark:border-zinc-700/40 select-none">
+                  {order.sektor}
+                </span>
+              )}
               {order.timestamp && (
                 <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-sans">
                   {order.timestamp}
