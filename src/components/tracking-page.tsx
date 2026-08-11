@@ -834,7 +834,7 @@ export function TrackingPage() {
                         className="text-xs h-8 gap-1.5 rounded-[4px] cursor-pointer whitespace-nowrap"
                         asChild
                       >
-                        <a href="https://wa.link/tddgvy" target="_blank" rel="noreferrer">
+                        <a href="https://wa.link/t7ajwp" target="_blank" rel="noreferrer">
                           <Phone className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                           Hubungi Admin
                         </a>
