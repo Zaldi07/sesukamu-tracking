@@ -1,3 +1,5 @@
+"use client"
+
 import * as React from "react"
 import Papa from "papaparse"
 import {
@@ -21,7 +23,6 @@ import {
 import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import logo from "@/assets/logo.png"
 
 // Helper to normalize Google Sheets URL to export CSV endpoint
 function formatGoogleSheetCsvUrl(url?: string): string {
@@ -40,8 +41,8 @@ const DEFAULT_CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4lQFbpqm66h6oZQaFG6AT5QwTkwfy7yaE-7O1FqFPrtx4inFQ9vbw43sICVVp6M8b6c6jAIKH4adM/pub?gid=1226834802&single=true&output=csv"
 
 const SPREADSHEET_URL = formatGoogleSheetCsvUrl(
-  (import.meta.env.VITE_SPREADSHEET_URL as string | undefined) ||
-  (import.meta.env.VITE_SPREADSHEET_CSV_URL as string | undefined) ||
+  (process.env.NEXT_PUBLIC_SPREADSHEET_URL as string | undefined) ||
+  (process.env.NEXT_PUBLIC_SPREADSHEET_CSV_URL as string | undefined) ||
   DEFAULT_CSV_URL
 )
 
@@ -190,14 +191,13 @@ export function normalizeOrder(raw: RawOrder): NormalizedOrder {
     raw["Skor"] ||
     ""
 
-  // 1. Status Konfirmasi Pembayaran (Kolom '1' / 'Konfirmasi Pembayaran')
-  const col1 = (
+  // Unify status columns check
+  const statusRaw = (
     raw["1"] ||
-    raw["Konfirmasi Pembayaran"] ||
-    raw["Konfirmasi pembayaran"] ||
-    raw["konfirmasi pembayaran"] ||
-    raw["Status Pembayaran"] ||
     raw["Status"] ||
+    raw["Status Pesanan"] ||
+    raw["status"] ||
+    raw["Status Pembayaran"] ||
     ""
   ).toLowerCase().trim()
 
@@ -210,61 +210,75 @@ export function normalizeOrder(raw: RawOrder): NormalizedOrder {
     ""
   ).toLowerCase().trim()
 
-  // Status Invalid / Dibatalkan
-  const isInvalid =
-    col1.includes("tidak valid") ||
-    col1.includes("invalid") ||
-    col1.includes("batal") ||
-    col1.includes("ditolak") ||
-    isTruthy(raw["Invalid"]) ||
-    isTruthy(raw["invalid"]) ||
-    isTruthy(raw["Batal"])
+  // Primary check: support new single-status dropdown values exactly as defined
+  const isNewStatusInvalid = statusRaw === "tidak_valid" || statusRaw === "tidak valid"
+  const isNewStatusSelesai = statusRaw === "selesai"
+  const isNewStatusSiapDiambil = statusRaw === "siap_diambil" || statusRaw === "siap diambil"
+  const isNewStatusPembayaranValid = statusRaw === "pembayaran_valid" || statusRaw === "pembayaran valid"
+  const isNewStatusVerifikasiPembayaran = statusRaw === "verifikasi_pembayaran" || statusRaw === "verifikasi pembayaran"
 
-  // Status Selesai (Tahap 3)
-  const isSelesai =
-    !isInvalid && (
-      col2.includes("selesai") ||
-      col2.includes("diterima") ||
-      col2.includes("done") ||
-      isTruthy(raw["Selesai"]) ||
-      isTruthy(raw["selesai"]) ||
-      isTruthy(raw["Diterima"])
-    )
+  const hasNewStatus = isNewStatusInvalid || isNewStatusSelesai || isNewStatusSiapDiambil || isNewStatusPembayaranValid || isNewStatusVerifikasiPembayaran
 
-  // Status Siap Diambil / Diantar (Tahap 2)
-  const isSiapDiambil =
-    !isInvalid && (
-      isSelesai ||
-      col2.includes("siap") ||
-      col2.includes("ready") ||
-      col2.includes("ambil") ||
-      isTruthy(raw["Siap Diambil"]) ||
-      isTruthy(raw["Siap diambil"]) ||
-      isTruthy(raw["siap diambil"]) ||
-      isTruthy(raw["Ready"])
-    )
+  let isInvalid = false
+  let isSelesai = false
+  let isSiapDiambil = false
+  let isKonfirmasiSelesai = false
 
-  // Status Konfirmasi Pembayaran Selesai (Tahap 1 Done)
-  // Bernilai selesai jika:
-  // - col1 bernilai "selesai", "valid", "terverifikasi", "dikonfirmasi", "lunas", "sudah bayar", "true", "1"
-  // - ATAU pesanan sudah masuk ke tahap siap diambil / tahap selesai
-  const isKonfirmasiSelesai =
-    !isInvalid && (
-      isSelesai ||
-      isSiapDiambil ||
-      col1 === "selesai" ||
-      col1.includes("selesai") ||
-      col1 === "valid" ||
-      col1.includes("terverifikasi") ||
-      col1.includes("dikonfirmasi") ||
-      col1.includes("lunas") ||
-      col1.includes("sudah bayar") ||
-      isTruthy(raw["Konfirmasi Pembayaran"]) ||
-      isTruthy(raw["Konfirmasi pembayaran"]) ||
-      isTruthy(raw["Valid"])
-    )
+  if (hasNewStatus) {
+    isInvalid = isNewStatusInvalid
+    isSelesai = isNewStatusSelesai
+    isSiapDiambil = isNewStatusSelesai || isNewStatusSiapDiambil
+    isKonfirmasiSelesai = isNewStatusSelesai || isNewStatusSiapDiambil || isNewStatusPembayaranValid
+  } else {
+    // Backward compatibility for legacy two-column structure (col1 / col2)
+    isInvalid =
+      statusRaw.includes("tidak valid") ||
+      statusRaw.includes("invalid") ||
+      statusRaw.includes("batal") ||
+      statusRaw.includes("ditolak") ||
+      isTruthy(raw["Invalid"]) ||
+      isTruthy(raw["invalid"]) ||
+      isTruthy(raw["Batal"])
 
-  // Status Konfirmasi Pembayaran Sedang Diproses (Tahap 1 Active)
+    isSelesai =
+      !isInvalid && (
+        col2.includes("selesai") ||
+        col2.includes("diterima") ||
+        col2.includes("done") ||
+        isTruthy(raw["Selesai"]) ||
+        isTruthy(raw["selesai"]) ||
+        isTruthy(raw["Diterima"])
+      )
+
+    isSiapDiambil =
+      !isInvalid && (
+        isSelesai ||
+        col2.includes("siap") ||
+        col2.includes("ready") ||
+        col2.includes("ambil") ||
+        isTruthy(raw["Siap Diambil"]) ||
+        isTruthy(raw["Siap diambil"]) ||
+        isTruthy(raw["siap diambil"]) ||
+        isTruthy(raw["Ready"])
+      )
+
+    isKonfirmasiSelesai =
+      !isInvalid && (
+        isSelesai ||
+        isSiapDiambil ||
+        statusRaw === "selesai" ||
+        statusRaw.includes("selesai") ||
+        statusRaw === "valid" ||
+        statusRaw.includes("terverifikasi") ||
+        statusRaw.includes("dikonfirmasi") ||
+        statusRaw.includes("lunas") ||
+        statusRaw.includes("sudah bayar") ||
+        isTruthy(raw["Konfirmasi Pembayaran"]) ||
+        isTruthy(raw["Konfirmasi pembayaran"]) ||
+        isTruthy(raw["Valid"])
+      )
+  }
+
   const isKonfirmasiProses = !isInvalid && !isKonfirmasiSelesai
 
   let paymentStatus: PaymentStatus = "proses"
@@ -284,7 +298,7 @@ export function normalizeOrder(raw: RawOrder): NormalizedOrder {
   } else if (isSiapDiambil) {
     statusText = "Siap Diambil"
   } else if (isKonfirmasiSelesai) {
-    statusText = "Pembayaran Terverifikasi"
+    statusText = "Pembayaran Valid"
   } else {
     statusText = "Verifikasi Pembayaran"
   }
@@ -326,7 +340,7 @@ function BrandLogo() {
   return (
     <div className="flex items-center gap-2 py-1">
       <img
-        src={logo}
+        src="/logo.png"
         alt="Logo"
         className="h-14 sm:h-20 md:h-20 w-auto object-contain transition-all"
       />
@@ -388,8 +402,8 @@ export function TrackingPage() {
 
           setAllOrders(normalized)
           if (normalized.length > 0) {
-            localStorage.setItem("cached_orders_data", JSON.stringify(parsed))
-            localStorage.setItem("cached_orders_timestamp", Date.now().toString())
+            localStorage.setItem("cached_orders_data_v2", JSON.stringify(parsed))
+            localStorage.setItem("cached_orders_timestamp_v2", Date.now().toString())
           }
 
           setSelectedOrder(current => {
@@ -408,7 +422,7 @@ export function TrackingPage() {
       console.error(err)
 
       // Fallback to cached data if available
-      const cachedData = localStorage.getItem("cached_orders_data")
+      const cachedData = localStorage.getItem("cached_orders_data_v2")
       if (cachedData) {
         try {
           const parsed = JSON.parse(cachedData) as RawOrder[]
@@ -630,21 +644,21 @@ export function TrackingPage() {
     if (order.isSelesai) {
       return {
         label: "Pesanan Selesai",
-        badge: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50",
+        badge: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800/40 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700/50",
         icon: CheckCircle2
       }
     }
     if (order.isSiapDiambil) {
       return {
         label: "Siap Diambil",
-        badge: "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 border-blue-200 dark:border-blue-900/50",
+        badge: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50",
         icon: PackageCheck
       }
     }
     if (order.isKonfirmasiSelesai) {
       return {
-        label: "Pembayaran Terverifikasi",
-        badge: "bg-teal-50 text-teal-700 dark:bg-teal-950/30 dark:text-teal-400 border-teal-200 dark:border-teal-900/50",
+        label: "Pembayaran Valid",
+        badge: "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 border-blue-200 dark:border-blue-900/50",
         icon: CheckCircle2
       }
     }
@@ -1063,6 +1077,7 @@ export function TrackingPage() {
         </div>
       </main>
 
+
       {/* Footer */}
       <footer className="mt-16 border-t border-zinc-200 dark:border-zinc-800/80 bg-white/50 dark:bg-zinc-950 py-8 text-center text-[11px] text-zinc-500 dark:text-zinc-400 font-sans">
         <p>© 2026 Tracking Order App. All rights reserved.</p>
@@ -1098,11 +1113,6 @@ function OrderDetailCard({ order, steps, statusInfo }: OrderDetailCardProps) {
               <span className="font-mono text-xs font-bold bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-[4px] text-zinc-800 dark:text-zinc-200 border border-zinc-200/50 dark:border-zinc-700/50 select-none">
                 {order.id || "ID TIDAK TERSEDIA"}
               </span>
-              {order.idTransaksi && order.idTransaksi !== order.id && (
-                <span className="font-mono text-[10px] text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800/60 px-1.5 py-0.5 rounded-[4px] border border-zinc-200/50 dark:border-zinc-700/40 select-none">
-                  Trx: {order.idTransaksi}
-                </span>
-              )}
               {order.sektor && (
                 <span className="text-[10px] font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-[4px] border border-zinc-200/50 dark:border-zinc-700/40 select-none">
                   {order.sektor}
@@ -1162,11 +1172,6 @@ function OrderDetailCard({ order, steps, statusInfo }: OrderDetailCardProps) {
             <div className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
               {order.metodePengambilan || "-"}
             </div>
-            {order.alamatKos && (
-              <div className="text-[10.5px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Alamat Kos: <span className="font-medium text-zinc-700 dark:text-zinc-300">{order.alamatKos}</span>
-              </div>
-            )}
           </div>
         </div>
 

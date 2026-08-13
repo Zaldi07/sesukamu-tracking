@@ -1,8 +1,5 @@
 import { TrackingPage } from "@/components/tracking-page"
 
-export function App() {
+export default function Home() {
   return <TrackingPage />
 }
-
-export default App
-
